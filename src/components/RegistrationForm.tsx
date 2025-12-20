@@ -1,10 +1,12 @@
 import { useState, FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
+import { assignRoomToRegistration, getRoomNumber } from '../utils/roomAssignment';
 import { CheckCircle, Tent } from 'lucide-react';
 
 interface FormData {
   camperName: string;
   age: string;
+  gender: string;
   parentName: string;
   parentEmail: string;
   parentPhone: string;
@@ -19,6 +21,7 @@ export default function RegistrationForm() {
   const [formData, setFormData] = useState<FormData>({
     camperName: '',
     age: '',
+    gender: '',
     parentName: '',
     parentEmail: '',
     parentPhone: '',
@@ -32,6 +35,7 @@ export default function RegistrationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assignedRoomNumber, setAssignedRoomNumber] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -46,11 +50,18 @@ export default function RegistrationForm() {
     setError(null);
 
     try {
+      const roomId = await assignRoomToRegistration(formData.gender);
+
+      if (!roomId) {
+        throw new Error('No available rooms for this gender. Please try again later.');
+      }
+
       const { error: submitError } = await supabase
         .from('camp_registrations')
         .insert([{
           camper_name: formData.camperName,
           age: parseInt(formData.age),
+          gender: formData.gender,
           parent_name: formData.parentName,
           parent_email: formData.parentEmail,
           parent_phone: formData.parentPhone,
@@ -58,15 +69,19 @@ export default function RegistrationForm() {
           emergency_contact_phone: formData.emergencyContactPhone,
           medical_conditions: formData.medicalConditions,
           dietary_restrictions: formData.dietaryRestrictions,
-          session_preference: formData.sessionPreference
+          session_preference: formData.sessionPreference,
+          room_id: roomId
         }]);
 
       if (submitError) throw submitError;
 
+      const roomNumber = await getRoomNumber(roomId);
+      setAssignedRoomNumber(roomNumber);
       setIsSuccess(true);
       setFormData({
         camperName: '',
         age: '',
+        gender: '',
         parentName: '',
         parentEmail: '',
         parentPhone: '',
@@ -77,7 +92,7 @@ export default function RegistrationForm() {
         sessionPreference: ''
       });
 
-      setTimeout(() => setIsSuccess(false), 5000);
+      setTimeout(() => setIsSuccess(false), 8000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -96,6 +111,10 @@ export default function RegistrationForm() {
           <p className="text-gray-600 mb-6">
             Thank you for registering! We'll send a confirmation email to {formData.parentEmail} shortly.
           </p>
+          <div className="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-emerald-600 font-medium mb-2">Assigned Room</p>
+            <p className="text-4xl font-bold text-emerald-700">{assignedRoomNumber || 'TBD'}</p>
+          </div>
           <button
             onClick={() => setIsSuccess(false)}
             className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
@@ -159,6 +178,24 @@ export default function RegistrationForm() {
                       onChange={handleChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                     />
+                  </div>
+                  <div>
+                    <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-1">
+                      Gender *
+                    </label>
+                    <select
+                      id="gender"
+                      name="gender"
+                      required
+                      value={formData.gender}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white"
+                    >
+                      <option value="">Select gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
                   </div>
                 </div>
               </div>
