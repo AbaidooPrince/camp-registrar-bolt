@@ -1,10 +1,12 @@
 import { supabase } from '../lib/supabase';
 
 export async function assignRoomToRegistration(gender: string): Promise<string | null> {
+  const genderOptions = gender === 'Other' ? ['Co-ed'] : [gender, 'Co-ed'];
+
   const { data: rooms, error } = await supabase
     .from('rooms')
     .select('id, room_number, gender, capacity')
-    .in('gender', [gender, 'Co-ed'])
+    .in('gender', genderOptions)
     .order('room_number');
 
   if (error) throw error;
